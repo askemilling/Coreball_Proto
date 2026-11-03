@@ -61,6 +61,7 @@ const gemLayer=document.createElement('canvas');gemLayer.width=canvas.width;gemL
 const gemCtx=gemLayer.getContext('2d');gemCtx.setTransform(DPR,0,0,DPR,0,0);gemCtx.imageSmoothingEnabled=true;gemCtx.imageSmoothingQuality='high';
 function resizeRenderSurface(){const next=displayScale();if(Math.abs(next-DPR)<.01)return;DPR=next;canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);ctx.setTransform(DPR,0,0,DPR,0,0);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';gemLayer.width=canvas.width;gemLayer.height=canvas.height;gemCtx.setTransform(DPR,0,0,DPR,0,0);gemCtx.imageSmoothingEnabled=true;gemCtx.imageSmoothingQuality='high';gemLayerDirty=true;}
 window.addEventListener('resize',resizeRenderSurface);
+if('ResizeObserver' in window){const renderObserver=new ResizeObserver(resizeRenderSurface);renderObserver.observe(canvas);}
 window.COREBALL_ART_READY.then(()=>gemLayerDirty=true);
 function jewelTier(g){return Math.max(0,tiers.findIndex(h=>g.hp<=h));}
 function rebuildGemLayer(){
