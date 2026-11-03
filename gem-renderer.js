@@ -1,12 +1,19 @@
 /* Small, reusable image sprites: color is derived exclusively from current HP. */
 (()=>{
-const hues=[[.52,.59,.67],[1,1,1],[.08,.88,.58],[.05,.59,1],[.66,.24,1],[1,.62,.13],[1,.16,.47],[.29,.25,.39]];
+const hues=[[.52,.59,.67],[1,1,1],[.08,.88,.58],[.05,.59,1],[.66,.24,1],[1,.62,.13],[1,.16,.47],[.29,.25,.39],[.025,.028,.035],[.03,.025,.015]];
 const size=128;
 const rimOffsets=[[-5,0],[5,0],[0,-5],[0,5],[-4,-4],[4,-4],[-4,4],[4,4]];
-const edgeColors=[[128,164,201],[232,247,255],[57,255,183],[76,196,255],[188,124,255],[255,193,92],[255,112,167],[134,117,177]];
-window.COREBALL_GLOWS=edgeColors.map(color=>{
+const edgeColors=[[128,164,201],[232,247,255],[57,255,183],[76,196,255],[188,124,255],[255,193,92],[255,112,167],[134,117,177],[208,222,240],[245,190,80]];
+window.COREBALL_GLOWS=edgeColors.map((color,tier)=>{
  const c=document.createElement('canvas');c.width=c.height=96;const ctx=c.getContext('2d'),rgb=color.join(','),light=ctx.createRadialGradient(48,48,0,48,48,48);
- light.addColorStop(0,'rgba('+rgb+',.12)');light.addColorStop(.38,'rgba('+rgb+',.48)');light.addColorStop(.64,'rgba('+rgb+',.24)');light.addColorStop(1,'rgba('+rgb+',0)');ctx.fillStyle=light;ctx.fillRect(0,0,96,96);return c;
+ if(tier>=8){
+  light.addColorStop(0,'rgba(0,0,0,.98)');light.addColorStop(.34,'rgba(0,0,0,.92)');light.addColorStop(.58,'rgba(0,0,0,.65)');light.addColorStop(.76,'rgba('+rgb+',.23)');light.addColorStop(1,'rgba('+rgb+',0)');
+ }else{
+  light.addColorStop(0,'rgba('+rgb+',.12)');light.addColorStop(.38,'rgba('+rgb+',.48)');light.addColorStop(.64,'rgba('+rgb+',.24)');light.addColorStop(1,'rgba('+rgb+',0)');
+ }
+ ctx.fillStyle=light;ctx.fillRect(0,0,96,96);
+ if(tier>=8){ctx.save();ctx.translate(48,48);ctx.strokeStyle='rgba('+rgb+',.48)';ctx.shadowColor='rgb('+rgb+')';ctx.shadowBlur=5;ctx.lineWidth=1.8;for(let i=0;i<6;i++){ctx.save();ctx.rotate(i*Math.PI/3);ctx.beginPath();ctx.moveTo(-7,-12);ctx.bezierCurveTo(-24,-15,-31,-31,-9,-41);ctx.stroke();ctx.restore();}ctx.restore();}
+ return c;
 });
 window.COREBALL_JEWELS=hues.map(()=>Array.from({length:4},()=>{const c=document.createElement('canvas');c.width=c.height=size;return c}));
 const atlas=new Image();
@@ -14,9 +21,9 @@ window.COREBALL_ART_READY=new Promise((resolve,reject)=>{atlas.onload=()=>{
  const cellW=atlas.naturalWidth/2,cellH=atlas.naturalHeight/2;
  for(let v=0;v<4;v++){
   const src=document.createElement('canvas');src.width=src.height=size;const sc=src.getContext('2d',{willReadFrequently:true});sc.imageSmoothingEnabled=true;sc.imageSmoothingQuality='high';sc.drawImage(atlas,(v%2)*cellW,Math.floor(v/2)*cellH,cellW,cellH,0,0,size,size);const original=sc.getImageData(0,0,size,size);
-  for(let t=0;t<8;t++){
+  for(let t=0;t<hues.length;t++){
    const c=window.COREBALL_JEWELS[t][v],ctx=c.getContext('2d'),out=ctx.createImageData(size,size),rgb=hues[t];
-   for(let i=0;i<original.data.length;i+=4){const a=original.data[i+3];if(!a)continue;const l=(original.data[i]*.25+original.data[i+1]*.55+original.data[i+2]*.2)/255;const white=Math.max(0,(l-.72)/.28);for(let k=0;k<3;k++){const base=rgb[k]*Math.pow(l,.8)*1.15;out.data[i+k]=Math.min(255,255*(base*(1-white)+white));}out.data[i+3]=a;}
+   for(let i=0;i<original.data.length;i+=4){const a=original.data[i+3];if(!a)continue;const l=(original.data[i]*.25+original.data[i+1]*.55+original.data[i+2]*.2)/255;const white=Math.max(0,(l-.72)/.28);for(let k=0;k<3;k++){if(t>=8){out.data[i+k]=Math.round(255*(.006+Math.pow(l,2)*.052));}else if(t===7){out.data[i+k]=Math.round(255*(rgb[k]*Math.pow(l,1.5)*.3+white*.045));}else{const base=rgb[k]*Math.pow(l,.8)*1.15;out.data[i+k]=Math.min(255,255*(base*(1-white)+white));}}out.data[i+3]=a;}
    // Bake the fine silhouette rim and its halo once; no per-frame blur.
    const rim=document.createElement('canvas');rim.width=rim.height=size;const rc=rim.getContext('2d'),edge=rc.createImageData(size,size),color=edgeColors[t];
    for(let y=5;y<size-5;y++)for(let x=5;x<size-5;x++){
