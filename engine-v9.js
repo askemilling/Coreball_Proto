@@ -53,7 +53,7 @@ canvas.addEventListener('lostpointercapture',e=>{if(aim&&e.pointerId===aim.point
 
 function shardsAt(x,y,t,count=9){let color=cols[t];for(let i=0;i<count;i++){let a=rand(0,6.283),v=rand(1,4);shards.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rand(22,42),max:42,c:color,t,v:ri(0,4),angle:rand(0,6.28),spin:rand(-.2,.2),r:rand(1.5,4)})}if(shards.length>420)shards.splice(0,shards.length-420)}
 function awardDestroyed(g){if(g.dead)return false;if(g.super){g.dead=true;gemLayerDirty=true;pendingSuper++;aim=null;rings.push({x:g.x,y:g.y,r:4,life:35});update();sound('upgrade');return true;}g.dead=true;gemLayerDirty=true;cleared++;rings.push({x:g.x,y:g.y,r:2,life:12,hit:true});shardsAt(g.x,g.y,g.boss?5:g.t,g.boss?35:11);coins.push({x:g.x,y:g.y,vx:rand(-1,1),vy:-rand(1,2),v:g.boss?250:reward(g.t),life:0});return true}
-function hitGem(g,amount,fromBall=false){if(g.dead)return;g.hp-=amount;gemLayerDirty=true;fastNoHitMs=0;g.hitFlash=10;if(fromBall)g.cd=3;if(g.hp<=0)destroy(g);else{shardsAt(g.x,g.y,g.boss?5:jewelTier(g),3);rings.push({x:g.x,y:g.y,r:3,life:7,hit:true});}}
+function hitGem(g,amount,fromBall=false){if(g.dead)return;g.hp-=amount;gemLayerDirty=true;fastNoHitMs=0;g.hitFlash=10;if(fromBall)g.cd=3;if(g.hp<=0)destroy(g);else{sound('hit');shardsAt(g.x,g.y,g.boss?5:jewelTier(g),3);rings.push({x:g.x,y:g.y,r:3,life:7,hit:true});}}
 function detonate(g){rings.push({x:g.x,y:g.y,r:3,prev:0,max:74,speed:.9,life:90,explosion:true,affected:new Set()});shake=Math.max(shake,6);sound('bomb');}
 function destroy(g){if(!awardDestroyed(g))return;if(g.bomb)detonate(g);else sound('crystal');}
 function advanceExplosions(){for(const ring of [...rings]){if(!ring.explosion)continue;ring.prev=ring.r;ring.r=Math.min(ring.max,ring.r+ring.speed);ring.life--;if(!ring.affected)ring.affected=new Set();for(const g of gems){if(g.dead||ring.affected.has(g))continue;if(Math.hypot(g.x-ring.x,g.y-ring.y)<=ring.r+gemRadius(g)){ring.affected.add(g);hitGem(g,24);}}}}
@@ -83,7 +83,8 @@ const orbTexture=new Image();orbTexture.src='./assets/orb-v9.png';
 const perfMode=new URLSearchParams(location.search).has('perf');
 let perfOutput=null,frameSamples=[],cpuSamples=[],lastSample=0,lastRender=0;
 if(perfMode){perfOutput=document.createElement('output');perfOutput.id='performance';perfOutput.style='display:block;position:fixed;bottom:4px;left:4px;z-index:99;background:#000c;color:#bff;padding:5px;font:11px monospace;pointer-events:none';document.body.append(perfOutput);}
-function drawOrb(x,y,r){if(superLevels.saw)drawSaw(x,y,r);const im=orbTexture.complete&&orbTexture.naturalWidth?orbTexture:imgs.ball;if(im.complete&&im.naturalWidth)ctx.drawImage(im,x-r*1.7,y-r*1.7,r*3.4,r*3.4);}
+const orbGlow=document.createElement('canvas');orbGlow.width=orbGlow.height=128;const og=orbGlow.getContext('2d'),ogFill=og.createRadialGradient(64,64,0,64,64,64);ogFill.addColorStop(0,'rgba(232,253,255,.9)');ogFill.addColorStop(.22,'rgba(139,233,255,.75)');ogFill.addColorStop(.48,'rgba(69,195,255,.38)');ogFill.addColorStop(1,'rgba(38,138,255,0)');og.fillStyle=ogFill;og.fillRect(0,0,128,128);
+function drawOrb(x,y,r){ctx.save();ctx.globalCompositeOperation='screen';ctx.drawImage(orbGlow,x-r*3.1,y-r*3.1,r*6.2,r*6.2);ctx.strokeStyle='#c2f6ff';ctx.lineWidth=.85;ctx.beginPath();ctx.arc(x,y,r*1.08,0,Math.PI*2);ctx.stroke();ctx.restore();if(superLevels.saw)drawSaw(x,y,r);const im=orbTexture.complete&&orbTexture.naturalWidth?orbTexture:imgs.ball;if(im.complete&&im.naturalWidth)ctx.drawImage(im,x-r*1.7,y-r*1.7,r*3.4,r*3.4);}
 
 const lootCanvas=$('lootfx'),lootCtx=lootCanvas.getContext('2d');let lootLayout=null,lootWidth=0,lootHeight=0,lootDpr=0,walletFlash=0;
 function syncLootLayout(){
@@ -146,7 +147,7 @@ function render(t){
 
  drawProjectiles();for(const b of balls){if(!b.live)continue;for(let trail=4;trail>0;trail--){ctx.globalAlpha=.13*(1-trail/5);ctx.fillStyle='#67ceff';ctx.beginPath();ctx.arc(b.x-b.vx*trail,b.y-b.vy*trail,size*(1-trail/6),0,7);ctx.fill();}ctx.globalAlpha=1;drawOrb(b.x,b.y,size);}
  if(!active){drawOrb(origin.x,origin.y,size);if(aim){const {dx,dy}=shotDirection(aim);ctx.setLineDash([2,6]);ctx.strokeStyle='#b7eaff';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(origin.x,origin.y);ctx.lineTo(origin.x+dx*140,origin.y+dy*140);ctx.stroke();ctx.setLineDash([]);}}
- for(const heal of healingTexts){const u=1-heal.life/72;ctx.save();ctx.globalAlpha=Math.min(1,heal.life/22);ctx.textAlign='center';ctx.font='700 '+(13+u*2)+'px system-ui';ctx.shadowColor='#38ff91';ctx.shadowBlur=7;ctx.fillStyle='#88ffb5';ctx.fillText('+'+heal.amount,heal.x,heal.y-u*32);ctx.shadowBlur=0;for(let n=0;n<4;n++){ctx.globalAlpha=(heal.life/72)*.5;ctx.fillStyle='#a5ffcb';ctx.beginPath();ctx.arc(heal.x+Math.sin(n*2+u*5)*(4+u*9),heal.y-u*38-n*3,.7,0,Math.PI*2);ctx.fill();}ctx.restore();}
+ for(const heal of healingTexts){const u=1-heal.life/72;ctx.save();ctx.globalAlpha=Math.min(1,heal.life/22);ctx.textAlign='center';ctx.font='850 '+(22+u*3)+'px system-ui';ctx.shadowColor='#28ff83';ctx.shadowBlur=12*DPR;ctx.strokeStyle='#063a20';ctx.lineWidth=3;ctx.strokeText('+'+heal.amount,heal.x,heal.y-u*39);ctx.fillStyle='#b7ffcf';ctx.fillText('+'+heal.amount,heal.x,heal.y-u*39);ctx.shadowBlur=0;for(let n=0;n<4;n++){ctx.globalAlpha=(heal.life/72)*.5;ctx.fillStyle='#a5ffcb';ctx.beginPath();ctx.arc(heal.x+Math.sin(n*2+u*5)*(4+u*9),heal.y-u*38-n*3,.7,0,Math.PI*2);ctx.fill();}ctx.restore();}
  ctx.restore();renderLoot();
 }
 function advanceEffects(){for(const heal of healingTexts)heal.life--;healingTexts=healingTexts.filter(heal=>heal.life>0);
@@ -242,4 +243,4 @@ $('openupgrade').onclick=()=>{if(ended||superPaused)return;aim=null;shopOpen=tru
 $('opensuper').onclick=()=>{if(ended)return;aim=null;shopOpen=true;$('shop').hidden=true;$('supershop').hidden=false;update();};
 $('closesuper').onclick=()=>{shopOpen=false;$('supershop').hidden=true;};
 $('closeshop').onclick=()=>{shopOpen=false;$('shop').hidden=true;};
-for(const key of ['guns','saw','regen'])$('super'+key).onclick=()=>{if(!pendingSuper||ended||!shopOpen)return;superLevels[key]++;if(!active)origin.y=launchY();pendingSuper--;superPaused=false;sound('upgrade');update();};
+for(const key of ['guns','saw','regen'])$('super'+key).onclick=()=>{if(!pendingSuper||ended||!shopOpen)return;superLevels[key]++;if(!active)origin.y=launchY();pendingSuper--;superPaused=false;sound('superupgrade');update();};
