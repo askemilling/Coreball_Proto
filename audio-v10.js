@@ -2,7 +2,7 @@
 (()=>{
  const files={crystal:'./assets/audio/glass-break.wav',bomb:'./assets/audio/bomb-blast.wav',upgrade:'./assets/audio/upgrade-reward.wav'};
  let ctx=null,master=null,compressor=null,decodeJob=null,unlocked=false,silentMedia=null,lastError='',pending=[];
- let musicEnabled=false,musicSource=null,musicGain=null,musicBuffer=null;try{musicEnabled=localStorage.getItem('coreball-music')==='on';}catch{}
+ let musicEnabled=false,musicSource=null,musicGain=null,musicBuffer=null,musicVolume=.6;try{musicEnabled=localStorage.getItem('coreball-music')==='on';const saved=Number.parseFloat(localStorage.getItem('coreball-music-volume'));if(Number.isFinite(saved))musicVolume=Math.max(0,Math.min(1,saved));}catch{}
  const buffers={},active=new Set(),lastPlayed={crystal:-Infinity,bomb:-Infinity};
  const limits={crystal:.075,bomb:.055,hit:.055,superupgrade:.18};
  const volumes={crystal:.22,bomb:.72,upgrade:.62,hit:.35,superupgrade:.65};
@@ -101,8 +101,9 @@
  function startMusic(){
   if(!musicEnabled||!unlocked||!ctx||ctx.state!=='running'||document.hidden||musicSource)return;
   if(!musicBuffer)musicBuffer=makeLofiLoop();
-  musicSource=ctx.createBufferSource();musicSource.buffer=musicBuffer;musicSource.loop=true;musicGain=ctx.createGain();musicGain.gain.value=.14;musicSource.connect(musicGain);musicGain.connect(master);musicSource.start();
+  musicSource=ctx.createBufferSource();musicSource.buffer=musicBuffer;musicSource.loop=true;musicGain=ctx.createGain();musicGain.gain.value=musicVolume*.65;musicSource.connect(musicGain);musicGain.connect(master);musicSource.start();
  }
+ function setMusicVolume(value){if(!Number.isFinite(value))return;musicVolume=Math.max(0,Math.min(1,value));try{localStorage.setItem('coreball-music-volume',String(musicVolume));}catch{}if(musicGain){if(musicGain.gain.setTargetAtTime)musicGain.gain.setTargetAtTime(musicVolume*.65,ctx.currentTime,.025);else musicGain.gain.value=musicVolume*.65;}}
  async function toggleMusic(){musicEnabled=!musicEnabled;try{localStorage.setItem('coreball-music',musicEnabled?'on':'off');}catch{}musicLabel();if(!musicEnabled){stopMusic();return;}if(await unlock())startMusic();}
  musicLabel();
 
@@ -110,5 +111,5 @@
  async function preview(){previewTimer.forEach(clearTimeout);previewTimer=[];pending=[];if(lastError&&ctx){for(const [kind,url] of Object.entries(files))requests[kind]=requestSample(url);decodeJob=decodeSamples();}if(!await unlock())return;playNow('superupgrade');previewTimer.push(setTimeout(()=>playNow('hit'),1900),setTimeout(()=>playNow('crystal'),2350),setTimeout(()=>playNow('bomb'),3050));}
  for(const event of ['pointerdown','touchstart','touchend','keydown'])document.addEventListener(event,()=>{unlock();},{passive:true});
  document.addEventListener('visibilitychange',()=>{if(document.hidden){pending=[];stopVoices();stopMusic();previewTimer.forEach(clearTimeout);previewTimer=[];if(silentMedia)silentMedia.pause();}});
- window.COREBALL_AUDIO={unlock,play,preview,toggleMusic,diagnostics:()=>({state:ctx?.state||'locked',ready:unlocked,loaded:Object.keys(buffers),active:active.size,musicEnabled,musicPlaying:!!musicSource,counts:{...counts},lastError})};
+ window.COREBALL_AUDIO={unlock,play,preview,toggleMusic,setMusicVolume,getMusicVolume:()=>musicVolume,diagnostics:()=>({state:ctx?.state||'locked',ready:unlocked,loaded:Object.keys(buffers),active:active.size,musicEnabled,musicVolume,musicPlaying:!!musicSource,counts:{...counts},lastError})};
 })();
