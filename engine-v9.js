@@ -34,7 +34,7 @@ function addGems(n,lo,hi,emerging=false){const opening=wave===1;let added=0;for(
 function relocateGem(g){let found=null;for(let radius=2;radius<=90&&!found;radius+=2)for(let k=0;k<24;k++){const angle=k*Math.PI/12,x=g.x+Math.cos(angle)*radius,y=g.y+Math.sin(angle)*radius;if(freeGemPosition(x,y,g,g)){found={x,y};break;}}if(!found){for(let y=CEILING+gemRadius(g)+2;y<FLOOR-gemRadius(g)-2&&!found;y+=4)for(let x=gemRadius(g)+2;x<W-gemRadius(g)-2;x+=4)if(freeGemPosition(x,y,g,g)){found={x,y};break;}}if(!found){let best=-Infinity;for(let y=CEILING+gemRadius(g)+2;y<FLOOR-gemRadius(g)-2;y+=5)for(let x=gemRadius(g)+2;x<W-gemRadius(g)-2;x+=5){if(!clearOfRails(x,y,g))continue;let clearance=Infinity;for(const other of gems)if(other!==g&&!other.dead)clearance=Math.min(clearance,Math.hypot(other.x-x,other.y-y)-gemRadius(other)-gemRadius(g));const score=clearance-Math.hypot(x-g.x,y-g.y)*.001;if(score>best){best=score;found={x,y};}}}if(found)Object.assign(g,found);return !!found;}
 function resolveRailOverlaps(){for(const g of gems)if(!g.dead&&!clearOfRails(g.x,g.y,g))relocateGem(g);gemLayerDirty=true;}
 function spawnBoss(){if(gems.some(g=>g.boss))return;const g={t:8,hp:100,bomb:false,dead:false,cd:0,boss:true};let pos=null;for(let y=CEILING+30;y<=CEILING+110&&!pos;y+=6){for(let offset=0;offset<=150&&!pos;offset+=10){for(const x of [180-offset,180+offset])if(clearOfRails(x,y,g)){pos={x,y};break;}}}if(!pos)pos=findGemPosition(CEILING+30,FLOOR-32,g);if(!pos)return;Object.assign(g,pos);gems.push(g);for(const other of gems){if(other===g||other.dead)continue;if(Math.hypot(other.x-g.x,other.y-g.y)<gemRadius(other)+gemRadius(g)+2)relocateGem(other);}rings.push({x:g.x,y:g.y,r:6,life:35});gemLayerDirty=true;}
-function reset(){healingTexts=[];$('supershop').hidden=true;superLevels={guns:0,saw:0,regen:0};pendingSuper=0;superPaused=false;shopOpen=false;projectiles=[];$('shop').hidden=true;gemLayerDirty=true;fastForward=false;fastNoHitMs=0;spawnFramesRemaining=0;hp=100;wave=1;cleared=0;cash=0;damage=1;size=5;extra=1;dc=55;sc=100;ec=180;origin={x:180,y:launchY()};balls=[];shards=[];coins=[];rings=[];gems=[];rails=[{x:68,y:214,len:68,angle:-.28},{x:245,y:330,len:76,angle:.23}];rails=rails.filter(railAboveLaunchZone);aim=null;active=false;shotFrames=0;ended=false;shake=0;addGems(165,CEILING+12,252);$('over').style.display='none';update()}
+function reset(){if(typeof lootCtx!=='undefined'){lootCtx.clearRect(0,0,lootWidth,lootHeight);walletFlash=0;}healingTexts=[];$('supershop').hidden=true;superLevels={guns:0,saw:0,regen:0};pendingSuper=0;superPaused=false;shopOpen=false;projectiles=[];$('shop').hidden=true;gemLayerDirty=true;fastForward=false;fastNoHitMs=0;spawnFramesRemaining=0;hp=100;wave=1;cleared=0;cash=0;damage=1;size=5;extra=1;dc=55;sc=100;ec=180;origin={x:180,y:launchY()};balls=[];shards=[];coins=[];rings=[];gems=[];rails=[{x:68,y:214,len:68,angle:-.28},{x:245,y:330,len:76,angle:.23}];rails=rails.filter(railAboveLaunchZone);aim=null;active=false;shotFrames=0;ended=false;shake=0;addGems(165,CEILING+12,252);$('over').style.display='none';update()}
 const uiValues={};function textValue(id,value){if(uiValues[id]===value)return;uiValues[id]=value;$(id).textContent=value;}
 function update(){for(const key of ['guns','saw','regen']){const n=superLevels[key];textValue(key+'level','LV '+n+' → '+(n+1)+' · +'+(n+1)+(key==='regen'?' HP / WAVE':' DMG'));}textValue('hp',hp);textValue('wave',wave);textValue('cleared',cleared);textValue('cash',cash);textValue('shopcash',cash);textValue('supercash',pendingSuper);textValue('supertokens',pendingSuper+'/1');$('opensuper').classList.toggle('available',pendingSuper>0&&!ended);$('opensuper').disabled=ended;for(const key of ['guns','saw','regen'])$('super'+key).disabled=pendingSuper<1||ended;const affordable=!ended&&(cash>=dc||(size<10&&cash>=sc)||(extra<8&&cash>=ec));$('openupgrade').classList.toggle('affordable',affordable);textValue('dmg',damage);if(uiValues.hpWidth!==hp){$('hpfill').style.width=hp+'%';uiValues.hpWidth=hp;}textValue('dc',dc+' ◆');textValue('sc',sc+' ◆');textValue('ec',ec+' ◆');for(const [id,cost] of [['damage',dc],['size',sc],['extra',ec]]){const disabled=cash<cost||(active&&!shopOpen)||ended||(id==='size'&&size>=10)||(id==='extra'&&extra>=8);if($(id).disabled!==disabled)$(id).disabled=disabled;}textValue('remaining',gems.filter(g=>!g.dead).length+' CRYSTALS'+(gems.some(g=>g.super&&!g.dead)?' · SUPER CRYSTAL!':gems.some(g=>g.boss)?' · GOLD BOSS!':''));textValue('status',active?(fastForward?'FAST FORWARD ×4':'IN FLIGHT'):spawnFramesRemaining?'CRYSTALS EMERGING':'READY');textValue('hint',active?'':spawnFramesRemaining?'CRYSTALS EMERGING':'DRAG ANYWHERE · RELEASE TO FIRE');const speed=$('fastforward');speed.disabled=!active;speed.setAttribute('aria-pressed',String(fastForward));textValue('fastforward',fastForward?'⚡ 4×':'⚡ »');}
 function buy(type){unlockAudio();if((active&&!shopOpen)||ended||superPaused)return;let before=cash;if(type==='damage'&&cash>=dc){cash-=dc;damage++;dc=Math.ceil(dc*1.55)}if(type==='size'&&cash>=sc&&size<10){cash-=sc;size=Math.min(10,size+.7);sc=Math.ceil(sc*1.7)}if(type==='extra'&&cash>=ec&&extra<8){cash-=ec;extra=Math.min(8,extra+1);ec=Math.ceil(ec*1.9)}if(cash<before){if(!active)origin.y=launchY();sound('upgrade');}update()}
@@ -84,6 +84,34 @@ const perfMode=new URLSearchParams(location.search).has('perf');
 let perfOutput=null,frameSamples=[],cpuSamples=[],lastSample=0,lastRender=0;
 if(perfMode){perfOutput=document.createElement('output');perfOutput.id='performance';perfOutput.style='display:block;position:fixed;bottom:4px;left:4px;z-index:99;background:#000c;color:#bff;padding:5px;font:11px monospace;pointer-events:none';document.body.append(perfOutput);}
 function drawOrb(x,y,r){if(superLevels.saw)drawSaw(x,y,r);const im=orbTexture.complete&&orbTexture.naturalWidth?orbTexture:imgs.ball;if(im.complete&&im.naturalWidth)ctx.drawImage(im,x-r*1.7,y-r*1.7,r*3.4,r*3.4);}
+
+const lootCanvas=$('lootfx'),lootCtx=lootCanvas.getContext('2d');let lootLayout=null,lootWidth=0,lootHeight=0,lootDpr=0,walletFlash=0;
+function syncLootLayout(){
+ const board=canvas.getBoundingClientRect(),wallet=$('cash').parentElement.getBoundingClientRect();
+ if(!board.width||!board.height)return;
+ lootLayout={left:board.left,top:board.top,sx:board.width/W,sy:board.height/H,tx:wallet.left+wallet.width/2,ty:wallet.top+wallet.height/2};
+ const dpr=Math.min(3,window.devicePixelRatio||1),width=window.innerWidth,height=window.innerHeight;
+ if(width!==lootWidth||height!==lootHeight||dpr!==lootDpr){lootWidth=width;lootHeight=height;lootDpr=dpr;lootCanvas.width=Math.round(width*dpr);lootCanvas.height=Math.round(height*dpr);lootCtx.setTransform(dpr,0,0,dpr,0,0);}
+}
+const goldLoot=document.createElement('canvas');goldLoot.width=goldLoot.height=96;
+const goldCtx=goldLoot.getContext('2d'),goldHalo=goldCtx.createRadialGradient(48,48,2,48,48,45);
+goldHalo.addColorStop(0,'rgba(255,236,139,.9)');goldHalo.addColorStop(.3,'rgba(255,184,32,.55)');goldHalo.addColorStop(1,'rgba(255,141,0,0)');
+goldCtx.fillStyle=goldHalo;goldCtx.fillRect(0,0,96,96);
+const goldFill=goldCtx.createLinearGradient(30,22,62,72);goldFill.addColorStop(0,'#fffbd1');goldFill.addColorStop(.3,'#ffe17b');goldFill.addColorStop(.55,'#ffba24');goldFill.addColorStop(1,'#c67a00');goldCtx.fillStyle=goldFill;goldCtx.strokeStyle='#fff3b2';goldCtx.lineWidth=2;
+goldCtx.beginPath();goldCtx.moveTo(48,22);goldCtx.lineTo(64,43);goldCtx.lineTo(48,74);goldCtx.lineTo(32,43);goldCtx.closePath();goldCtx.fill();goldCtx.stroke();goldCtx.strokeStyle='#fff9ce';goldCtx.beginPath();goldCtx.moveTo(48,22);goldCtx.lineTo(48,74);goldCtx.moveTo(32,43);goldCtx.lineTo(64,43);goldCtx.stroke();
+function renderLoot(){
+ syncLootLayout();lootCtx.clearRect(0,0,lootWidth,lootHeight);if(!lootLayout)return;
+ const q=lootLayout;
+ lootCtx.save();lootCtx.globalCompositeOperation='screen';
+ for(const c of coins){
+  const x=q.left+c.x*q.sx,y=q.top+c.y*q.sy;
+  if(c.px!==undefined){const px=q.left+c.px*q.sx,py=q.top+c.py*q.sy;lootCtx.strokeStyle='#ffd75c';lootCtx.globalAlpha=.6;lootCtx.lineWidth=2;lootCtx.beginPath();lootCtx.moveTo(px,py);lootCtx.lineTo(x,y);lootCtx.stroke();}
+  lootCtx.globalAlpha=1;lootCtx.drawImage(goldLoot,x-12,y-12,24,24);
+ }
+ if(walletFlash>0){lootCtx.globalAlpha=walletFlash/12;lootCtx.drawImage(goldLoot,q.tx-24,q.ty-24,48,48);walletFlash--;}
+ lootCtx.restore();
+}
+
 function render(t){
  ctx.clearRect(0,0,W,H);ctx.save();
  if(shake>.3)ctx.translate(Math.sin(t*.11)*shake,Math.cos(t*.14)*shake);
@@ -114,12 +142,12 @@ function render(t){
   if(flash>0){const burst=ctx.createRadialGradient(r.x,r.y,0,r.x,r.y,25);burst.addColorStop(0,'rgba(255,255,230,'+flash*.85+')');burst.addColorStop(.35,'rgba(255,165,66,'+flash*.5+')');burst.addColorStop(1,'rgba(255,80,0,0)');ctx.fillStyle=burst;ctx.globalAlpha=fade;ctx.beginPath();ctx.arc(r.x,r.y,25,0,Math.PI*2);ctx.fill();}
   ctx.restore();
  }
- for(const s of shards){ctx.save();ctx.globalAlpha=Math.min(1,s.life/18);ctx.translate(s.x,s.y);ctx.rotate(s.angle);image('crystal'+s.t+'-'+s.v,-s.r,-s.r,s.r*2,s.r*2);ctx.restore();}ctx.globalAlpha=1;
- for(const c of coins){ctx.fillStyle='#ffe2a0';ctx.beginPath();ctx.moveTo(c.x,c.y-3);ctx.lineTo(c.x+2,c.y);ctx.lineTo(c.x,c.y+3);ctx.lineTo(c.x-2,c.y);ctx.fill();}
+ for(const s of shards){ctx.save();ctx.globalAlpha=Math.min(1,s.life/18);ctx.translate(s.x,s.y);ctx.rotate(s.angle);const shardGlow=window.COREBALL_GLOWS?.[s.t];if(shardGlow)ctx.drawImage(shardGlow,-s.r*2.7,-s.r*2.7,s.r*5.4,s.r*5.4);image('crystal'+s.t+'-'+s.v,-s.r,-s.r,s.r*2,s.r*2);ctx.restore();}ctx.globalAlpha=1;
+
  drawProjectiles();for(const b of balls){if(!b.live)continue;for(let trail=4;trail>0;trail--){ctx.globalAlpha=.13*(1-trail/5);ctx.fillStyle='#67ceff';ctx.beginPath();ctx.arc(b.x-b.vx*trail,b.y-b.vy*trail,size*(1-trail/6),0,7);ctx.fill();}ctx.globalAlpha=1;drawOrb(b.x,b.y,size);}
  if(!active){drawOrb(origin.x,origin.y,size);if(aim){const {dx,dy}=shotDirection(aim);ctx.setLineDash([2,6]);ctx.strokeStyle='#b7eaff';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(origin.x,origin.y);ctx.lineTo(origin.x+dx*140,origin.y+dy*140);ctx.stroke();ctx.setLineDash([]);}}
  for(const heal of healingTexts){const u=1-heal.life/72;ctx.save();ctx.globalAlpha=Math.min(1,heal.life/22);ctx.textAlign='center';ctx.font='700 '+(13+u*2)+'px system-ui';ctx.shadowColor='#38ff91';ctx.shadowBlur=7;ctx.fillStyle='#88ffb5';ctx.fillText('+'+heal.amount,heal.x,heal.y-u*32);ctx.shadowBlur=0;for(let n=0;n<4;n++){ctx.globalAlpha=(heal.life/72)*.5;ctx.fillStyle='#a5ffcb';ctx.beginPath();ctx.arc(heal.x+Math.sin(n*2+u*5)*(4+u*9),heal.y-u*38-n*3,.7,0,Math.PI*2);ctx.fill();}ctx.restore();}
- ctx.restore();
+ ctx.restore();renderLoot();
 }
 function advanceEffects(){for(const heal of healingTexts)heal.life--;healingTexts=healingTexts.filter(heal=>heal.life>0);
  if(spawnFramesRemaining>0)spawnFramesRemaining--;
@@ -131,7 +159,12 @@ function advanceEffects(){for(const heal of healingTexts)heal.life--;healingText
  rings=rings.filter(r=>r.life>0);
  for(const s of shards){s.x+=s.vx;s.y+=s.vy;s.vx*=.98;s.vy=s.vy*.98+.025;s.angle+=s.spin;s.life--;}
  shards=shards.filter(s=>s.life>0);
- for(const c of coins){c.life++;const dx=325-c.x,dy=-45-c.y;c.x+=dx*.065;c.y+=dy*.065;if(Math.hypot(dx,dy)<16||c.life>110){c.dead=true;cash+=c.v;}}
+ for(const c of coins){
+  if(!lootLayout)continue;
+  c.life++;c.px=c.x;c.py=c.y;const q=lootLayout,tx=(q.tx-q.left)/q.sx,ty=(q.ty-q.top)/q.sy,dx=tx-c.x,dy=ty-c.y,distance=Math.hypot(dx*q.sx,dy*q.sy);
+  const travel=Math.min(distance,Math.max(4,distance*.08)),fraction=distance?travel/distance:1;c.x+=dx*fraction;c.y+=dy*fraction;
+  if(distance<=3){c.x=tx;c.y=ty;c.dead=true;cash+=c.v;walletFlash=12;}
+ }
  coins=coins.filter(c=>!c.dead);
 }
 
