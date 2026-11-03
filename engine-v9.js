@@ -107,13 +107,55 @@ function advanceEffects(){
  for(const c of coins){c.life++;const dx=325-c.x,dy=-45-c.y;c.x+=dx*.065;c.y+=dy*.065;if(Math.hypot(dx,dy)<16||c.life>110){c.dead=true;cash+=c.v;}}
  coins=coins.filter(c=>!c.dead);
 }
+
+const UPDATE_RESUME_KEY='coreball-update-resume-v1';
+let waitingVersion=null,checkingVersion=false,installingVersion=false;
+function saveForUpdate(){
+ const data={schema:1,savedAt:Date.now(),floor:FLOOR,hp,wave,cleared,cash,damage,size,extra,dc,sc,ec,origin,gems:gems.filter(g=>!g.dead),rails,coins,superLevels,pendingSuper,ended};
+ sessionStorage.setItem(UPDATE_RESUME_KEY,JSON.stringify(data));
+}
+function resumeAfterUpdate(){
+ try{
+  const raw=sessionStorage.getItem(UPDATE_RESUME_KEY);if(!raw)return;
+  const data=JSON.parse(raw);
+  if(data.schema!==1||Date.now()-data.savedAt>300000||!['hp','wave','cleared','cash','damage','size','extra','dc','sc','ec','floor'].every(k=>Number.isFinite(data[k]))||!Array.isArray(data.gems)||!Array.isArray(data.rails)||!data.superLevels)return;
+  ({hp,wave,cleared,cash,damage,size,extra,dc,sc,ec,origin,gems,rails,coins,superLevels,pendingSuper,ended}=data);
+  const scale=(FLOOR-CEILING)/(data.floor-CEILING);
+  for(const list of [gems,rails,coins])for(const item of list)item.y=CEILING+(item.y-CEILING)*scale;
+  rails=rails.filter(railAboveLaunchZone);resolveRailOverlaps();origin.y=launchY();active=false;aim=null;shopOpen=false;superPaused=false;
+  if(ended){$('over').style.display='flex';$('score').textContent=cleared+' CRYSTALS CLEARED';}
+  gemLayerDirty=true;update();
+ }catch(error){/* A failed restore must leave the reset game usable. */reset();}
+ finally{try{sessionStorage.removeItem(UPDATE_RESUME_KEY);}catch(error){}}
+}
+async function checkForUpdate(){
+ if(checkingVersion||waitingVersion||document.hidden)return;
+ checkingVersion=true;
+ try{
+  const url=new URL('./index.html',location.href);url.searchParams.set('_update',Date.now());
+  const response=await fetch(url,{cache:'no-store'});if(!response.ok)return;
+  const html=await response.text(),match=html.match(/<title>COREBALL[^<]*V(\d+\.\d+)<\/title>/i),current=document.title.match(/V(\d+\.\d+)/);
+  if(match&&current){const parts=match[1].split('.').map(Number),old=current[1].split('.').map(Number);if(parts[0]>old[0]||(parts[0]===old[0]&&parts[1]>old[1])){waitingVersion=match[1];textValue('update-notice','UPDATE READY · INSTALLING BETWEEN SHOTS');$('update-notice').hidden=false;}}
+ }catch(error){/* Keep playing when offline. */}
+ finally{checkingVersion=false;}
+}
+function installWaitingUpdate(){
+ if(!waitingVersion||installingVersion||active||shopOpen||aim||spawnFramesRemaining||coins.length||rings.some(r=>r.explosion))return false;
+ try{saveForUpdate();}catch(error){return false;}
+ installingVersion=true;const url=new URL(location.href);url.searchParams.set('v',waitingVersion);location.replace(url.href);return true;
+}
+window.addEventListener('pageshow',checkForUpdate);
+window.addEventListener('focus',checkForUpdate);
+document.addEventListener?.('visibilitychange',()=>{if(!document.hidden)checkForUpdate();});
+setInterval(checkForUpdate,60000);
+
 let last=0,acc=0;
 function stepWorld(elapsed){if(superPaused||shopOpen){acc=0;return;}acc+=Math.min(50,elapsed);if(fastForward&&active&&!document.hidden)fastNoHitMs+=Math.min(250,elapsed);let n=0;while(acc>=16.67&&n<3){const steps=fastForward?FAST_MULTIPLIER:1;for(let k=0;k<steps;k++){if(k>0&&!active)break;physics();advanceEffects();}acc-=16.67;n++;}if(fastForward&&active&&fastNoHitMs>=FAST_IDLE_LIMIT_MS)endShot();}
-function frame(t){const cpuStart=performance.now();const elapsed=last?t-last:16.67;last=t;stepWorld(elapsed);
+function frame(t){const cpuStart=performance.now();const elapsed=last?t-last:16.67;last=t;stepWorld(elapsed);if(installWaitingUpdate())return;
 if(t-lastRender>=15){render(t);if(perfMode&&lastRender)frameSamples.push(t-lastRender);lastRender=t;}
 if(t-lastSample>=100){update();lastSample=t;}
 if(perfMode){cpuSamples.push(performance.now()-cpuStart);if(frameSamples.length>=120){const sorted=frameSamples.slice().sort((a,b)=>a-b);const cpu=cpuSamples.slice().sort((a,b)=>a-b);perfOutput.textContent='120 frames: '+(1000/(frameSamples.reduce((a,b)=>a+b)/frameSamples.length)).toFixed(1)+' FPS | p95 '+sorted[Math.floor(sorted.length*.95)].toFixed(1)+'ms | CPU p95 '+cpu[Math.floor(cpu.length*.95)].toFixed(1)+'ms | '+gems.filter(g=>!g.dead).length+' gems';frameSamples=[];cpuSamples=[];}}
-requestAnimationFrame(frame);}reset();requestAnimationFrame(frame);
+requestAnimationFrame(frame);}reset();resumeAfterUpdate();requestAnimationFrame(frame);
 
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))).catch(()=>{}));}
 
