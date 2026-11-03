@@ -8,9 +8,26 @@ const assert=require('node:assert/strict'),http=require('node:http'),fs=require(
  const result=await page.evaluate(()=>{
  const r={};r.wave1=gems.length===245&&gems.every(g=>g.hp===1&&g.t===0);endShot();r.wave2=wave===2&&gems.every(g=>g.hp===1&&g.t===0);reset();cash=1000;buy('damage');buy('size');buy('extra');r.upgrades=damage===2&&size>5&&extra===2;
  reset();let g=gems[0];g.x=180;g.y=200;gems=[g];balls=[{x:180,y:205,vx:0,vy:-5.6,live:true}];active=true;physics();r.collision=cleared===1;for(let i=0;i<120;i++)advanceEffects();r.loot=cash===1;
- reset();const bomb={x:100,y:100,t:0,hp:1,bomb:true,dead:false};gems=[bomb,{x:120,y:100,t:1,hp:2,dead:false}];destroy(bomb);for(let i=0;i<30;i++)advanceExplosions();r.chain=cleared===2;r.colors=[1,2,3,5,10,15,20,25].every((hp,t)=>jewelTier({hp})===t);r.mobile=document.body.scrollWidth===innerWidth&&DPR===2;r.compactSprites=COREBALL_JEWELS.flat().every(c=>c.width===64&&c.height===64);reset();return r;});
+ reset();const bomb={x:100,y:100,t:0,hp:1,bomb:true,dead:false};gems=[bomb,{x:120,y:100,t:1,hp:2,dead:false}];destroy(bomb);for(let i=0;i<30;i++)advanceExplosions();r.chain=cleared===2;r.colors=[1,2,3,5,10,15,20,25].every((hp,t)=>jewelTier({hp})===t);r.mobile=document.body.scrollWidth===innerWidth&&DPR===2;r.compactSprites=COREBALL_JEWELS.flat().every(c=>c.width===64&&c.height===64);
+ reset();const trigger={x:100,y:180,t:0,hp:1,bomb:true,dead:false};const black={x:140,y:180,t:7,hp:25,boss:false,dead:false};const gold={x:100,y:230,t:8,hp:100,boss:true,dead:false};const pink={x:80,y:180,t:6,hp:20,boss:false,dead:false};gems=[trigger,black,gold,pink];destroy(trigger);for(let i=0;i<90;i++)advanceExplosions();r.bombDamage=black.hp===1&&!black.dead&&gold.hp===76&&!gold.dead&&pink.dead;r.bombSlow=rings.find(x=>x.explosion).speed===.9;
+ reset();gems=[];rails=[];balls=[{x:180,y:180,vx:1,vy:0,live:true}];active=true;for(let i=0;i<2500;i++)physics();r.noNormalTimeout=active&&wave===1;
+ shotFrames=0;acc=0;toggleFastForward();stepWorld(16.67);r.fourTimes=shotFrames===4;
+ for(let i=0;i<535;i++)stepWorld(16.67);r.noEarlyFastTimeout=active;
+ const progress={x:180,y:300,t:8,hp:1000,boss:true,dead:false};gems=[progress];hitGem(progress,1,true);for(let i=0;i<539;i++)stepWorld(16.67);r.hitRestartsClock=active&&wave===1;for(let i=0;i<65;i++)stepWorld(16.67);r.fastTimeout=!active&&wave===2&&!fastForward;
+ reset();gems=[];rails=[];balls=[{x:180,y:CEILING+size+1,vx:0,vy:-5.6,live:true}];active=true;physics();r.flatCeiling=balls[0].vy>0&&balls[0].y>=CEILING+size;
+ reset();let spawnCountsOk=true;let layoutOk=gems.every(g=>clearOfRails(g.x,g.y,g)&&g.y-gemRadius(g)>=CEILING),counts=[];
+ for(let i=0;i<20;i++){gems=gems.filter(g=>g.y<FLOOR-60);endShot();counts.push(gems.length);spawnCountsOk=spawnCountsOk&&gems.filter(g=>g.emerge>0).length===Math.min(55,32+Math.floor(wave/3));const bad=gems.filter(g=>!clearOfRails(g.x,g.y,g)||g.y-gemRadius(g)<CEILING||g.y+gemRadius(g)>=FLOOR);if(bad.length)throw Error('Layout '+JSON.stringify({wave,bad:bad.map(g=>({x:g.x,y:g.y,boss:g.boss,dist:rails.map(rail=>distanceToRail(g.x,g.y,rail))})),rails}));layoutOk=layoutOk&&gems.every(g=>clearOfRails(g.x,g.y,g)&&g.y-gemRadius(g)>=CEILING&&g.y+gemRadius(g)<FLOOR);for(let j=0;j<18;j++)advanceEffects();}
+ r.railClearanceAndVisibility=layoutOk;r.waveSpawnCount=spawnCountsOk;r.goldSpawns=gems.some(g=>g.boss);r.spawnAnimationEnds=spawnFramesRemaining===0&&gems.every(g=>!g.emerge);reset();
+return r;});
  
+ for(const [name,passed] of Object.entries(result))assert.equal(passed,true,name);console.log('PASS rules',Object.keys(result).join(', '));
  const box=await page.locator('#game').boundingBox();
+ if(process.env.COREBALL_SCREENSHOT){await page.screenshot({path:process.env.COREBALL_SCREENSHOT,fullPage:true});await page.evaluate(()=>endShot());await page.waitForTimeout(450);await page.screenshot({path:process.env.COREBALL_SCREENSHOT.replace('.png','-wave2.png'),fullPage:true});await page.evaluate(()=>reset());}
+
+ const blocked=await page.evaluate(()=>{reset();endShot();const b=canvas.getBoundingClientRect(),options={bubbles:true,isPrimary:true,pointerId:1,clientX:b.x+b.width/2,clientY:b.y+b.height*.8};canvas.dispatchEvent(new PointerEvent('pointerdown',options));canvas.dispatchEvent(new PointerEvent('pointerup',options));return !active&&aim===null;});assert.equal(blocked,true,'emergence blocks early launch');
+ await page.evaluate(()=>{reset();gems=[];rails=[];balls=[{x:180,y:180,vx:1,vy:0,live:true}];active=true;update();});
+ await page.locator('#fastforward').click();assert.equal(await page.locator('#fastforward').getAttribute('aria-pressed'),'true');await page.locator('#fastforward').click();assert.equal(await page.locator('#fastforward').getAttribute('aria-pressed'),'false');
+
  for(const [edge,ox,dragX] of [['left',15,-40],['right',345,40]]){
   await page.evaluate(x=>{reset();gems=[];rails=[];gemLayerDirty=true;origin={x,y:451};},ox);
   const sx=box.x+180*box.width/360,sy=box.y+390*box.height/485;
@@ -34,10 +51,10 @@ const assert=require('node:assert/strict'),http=require('node:http'),fs=require(
  const recovered=await page.evaluate(async()=>{let testContext;/* Find context through the analyser, then force an interruption. */testContext=window.audioProbe.context;await testContext.suspend();sound('upgrade');const before=COREBALL_AUDIO.diagnostics().counts.upgrade;await COREBALL_AUDIO.unlock();await new Promise(r=>setTimeout(r,100));return {state:testContext.state,before,after:COREBALL_AUDIO.diagnostics().counts.upgrade};});
  assert.equal(recovered.state,'running');assert.equal(recovered.after,recovered.before+1,'first sound survives asynchronous resume');
  console.log('PASS edge dragging, prediction, pointer cancellation, 3 decoded samples, nonzero audio output, resume recovery');console.log('Audio output peak',energy.toFixed(3));
- const retryPage=await browser.newPage();let rejectOnce=true;
- await retryPage.route('**/assets/audio/glass-break.wav',route=>{if(rejectOnce){rejectOnce=false;return route.fulfill({status:503,body:'temporarily unavailable'});}return route.continue();});
+ const retryPage=await browser.newPage();let rejectAudio=true;
+ await retryPage.route('**/assets/audio/glass-break.wav',route=>{if(rejectAudio){return route.fulfill({status:503,body:'temporarily unavailable'});}return route.continue();});
  await retryPage.goto('http://127.0.0.1:'+server.address().port);await retryPage.locator('#soundtest').click();
- await retryPage.waitForFunction(()=>COREBALL_AUDIO.diagnostics().lastError!=='');
+ await retryPage.waitForFunction(()=>COREBALL_AUDIO.diagnostics().lastError!=='');rejectAudio=false;
  await retryPage.locator('#soundtest').click();await retryPage.waitForFunction(()=>COREBALL_AUDIO.diagnostics().ready);
  assert.equal(await retryPage.locator('#soundtest').getAttribute('data-audio-state'),'ready','failed sample can be retried');await retryPage.close();console.log('PASS recovery after failed audio download');
 
