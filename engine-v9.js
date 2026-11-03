@@ -43,10 +43,11 @@ $('fastforward').onclick=toggleFastForward;
 $('damage').onclick=()=>buy('damage');$('size').onclick=()=>buy('size');$('extra').onclick=()=>buy('extra');$('soundtest').onclick=()=>window.COREBALL_AUDIO.preview();$('reset').onclick=reset;$('again').onclick=reset;
 function coord(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
 function aimPoint(p){return {x:origin.x+p.x-aim.startX,y:origin.y+p.y-aim.startY};}
-function shotDirection(p){let dx=origin.x-p.x,dy=origin.y-p.y;if(Math.hypot(dx,dy)<10){dx=0;dy=-1;}let mag=Math.hypot(dx,dy);dx/=mag;dy/=mag;if(dy>-.13){dy=-.13;mag=Math.hypot(dx,dy);dx/=mag;dy/=mag;}return {dx,dy};}
+const MIN_SHOT_ANGLE=2*Math.PI/180;
+function shotDirection(p){let dx=origin.x-p.x,dy=origin.y-p.y;if(Math.hypot(dx,dy)<10){dx=0;dy=-1;}let mag=Math.hypot(dx,dy);dx/=mag;dy/=mag;if(dy>-Math.sin(MIN_SHOT_ANGLE)){dx=(dx<0?-1:1)*Math.cos(MIN_SHOT_ANGLE);dy=-Math.sin(MIN_SHOT_ANGLE);}return {dx,dy};}
 canvas.addEventListener('pointerdown',e=>{unlockAudio();if(active||ended||superPaused||shopOpen||spawnFramesRemaining>0||aim||!e.isPrimary)return;const p=coord(e);canvas.setPointerCapture(e.pointerId);aim={x:origin.x,y:origin.y,startX:p.x,startY:p.y,pointerId:e.pointerId};});
 canvas.addEventListener('pointermove',e=>{if(!aim||e.pointerId!==aim.pointerId)return;const p=aimPoint(coord(e));aim.x=p.x;aim.y=p.y;});
-canvas.addEventListener('pointerup',e=>{if(!aim||active||ended||e.pointerId!==aim.pointerId)return;const p=aimPoint(coord(e)),{dx,dy}=shotDirection(p);balls=[];for(let i=0;i<extra;i++){let a=Math.atan2(dy,dx)+(i-(extra-1)/2)*.025;balls.push({x:origin.x,y:origin.y,vx:Math.cos(a)*5.6,vy:Math.sin(a)*5.6,live:true,last:0});}active=true;shotFrames=0;fastForward=false;fastNoHitMs=0;aim=null;update();});
+canvas.addEventListener('pointerup',e=>{if(!aim||active||ended||e.pointerId!==aim.pointerId)return;const p=aimPoint(coord(e)),{dx,dy}=shotDirection(p);balls=[];for(let i=0;i<extra;i++){let a=Math.max(-Math.PI+MIN_SHOT_ANGLE,Math.min(-MIN_SHOT_ANGLE,Math.atan2(dy,dx)+(i-(extra-1)/2)*.025));balls.push({x:origin.x,y:origin.y,vx:Math.cos(a)*5.6,vy:Math.sin(a)*5.6,live:true,last:0});}active=true;shotFrames=0;fastForward=false;fastNoHitMs=0;aim=null;update();});
 canvas.addEventListener('pointercancel',e=>{if(aim&&e.pointerId===aim.pointerId)aim=null;});
 canvas.addEventListener('lostpointercapture',e=>{if(aim&&e.pointerId===aim.pointerId)aim=null;});
 
