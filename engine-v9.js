@@ -70,6 +70,7 @@ window.COREBALL_ART_READY.then(()=>{gemLayerDirty=true;for(const id of ['superic
 function jewelTier(g){return Math.max(0,tiers.findIndex(h=>g.hp<=h));}
 function rebuildGemLayer(){
  gemCtx.clearRect(0,0,W,H);
+ gemCtx.save();gemCtx.globalCompositeOperation='screen';for(const g of gems){if(g.dead||g.boss||g.super||g.bomb||g.emerge>0)continue;const halo=window.COREBALL_GLOWS?.[jewelTier(g)];if(halo)gemCtx.drawImage(halo,g.x-16,g.y-16,32,32);}gemCtx.restore();
  for(const g of gems){if(g.dead||g.boss||g.super||g.emerge>0)continue;const s=g.bomb?19:18;const im=imgs[g.bomb?'bomb':'crystal'+jewelTier(g)+'-'+g.variant];if(im&&(im instanceof HTMLCanvasElement||(im.complete&&im.naturalWidth)))gemCtx.drawImage(im,g.x-s/2,g.y-s/2,s,s);}
  gemLayerDirty=false;
 }
